@@ -1,0 +1,6 @@
+# pg_healer extension
+comment = 'automagical healing of database problems'
+default_version = '1.0'
+module_pathname = '$libdir/pg_healer'
+relocatable = true
+

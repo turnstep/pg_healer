@@ -1,0 +1,51 @@
+
+TODO list for the Postgres pg_healer extension
+
+
+* Put all these items into github and write the issue number below them
+  (e.g. URL here)
+
+* Rewrite cauldron as a C program
+
+* Make cauldron only copy on checksum validity
+
+* Handle non-checksummed databases smoother
+
+* Add GUCs to toggle automatic fixing off
+
+* Create a background process
+
+* Get test suite working better
+
+* Add i18n
+
+* Put in list of public extensions
+
+* Handle indexes
+
+* Reach out to replicas
+
+* Handle system catalogs
+
+* Handle other database items
+
+* Have repair code handle older header_versions
+
+* Test on non-standard block sizes
+
+* Possibly surpress the ERROR message if we have fixed things up
+
+* Give a hint to try rerunning your query once fixed
+
+* Catch other corruption related error messags
+
+* Lobby for 32-bit checksums
+
+* Solve the checksum SPOF problem
+
+* Check for transposed pages
+
+* Write to an audit table on all changes
+
+* Have the repair functions output the table name as well as the filepath
+
