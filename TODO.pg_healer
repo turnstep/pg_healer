@@ -5,6 +5,12 @@ TODO list for the Postgres pg_healer extension
 * Put all these items into github and write the issue number below them
   (e.g. URL here)
 
+* Once the problem is verified as fixed, somehow re-run the client's query. This 
+  may not be possible without a good bit of backend fiddling
+
+* Improve the locking such that only one pg_healer instance attempts to fix 
+  a particular problem
+
 * Rewrite cauldron as a C program
 
 * Make cauldron only copy on checksum validity
