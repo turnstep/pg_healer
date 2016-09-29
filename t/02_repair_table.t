@@ -31,17 +31,17 @@ like( run( 'CREATE EXTENSION pg_healer' ), qr/CREATE EXTENSION/, "$t (pg_healer)
 run( 'CHECKPOINT' );
 
 $t = '(freespace) Corrupting a page by adding junk to the free space in the middle';
-$msg = run( q{SELECT pg_healer_corrupt('foobar', 'freespace')} );
+$msg = run( qq{SELECT pg_healer_corrupt('$table', 'freespace')} );
 like( $msg, qr/Free space corruption introduced/, $t );
 
 $t = '(freespace) Selecting from the corrupted table gives expected error';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/invalid page in block/, $t );
 $t = '(freespace) Selecting from the corrupted table invokes auto healing';
 like( $msg, qr/intrinsic healing/, $t );
 
 $t = '(freespace) Selecting a second time from the corrupted table succeeds';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/12345/, $t );
 
 $t = '(lsn) Running pg_healer_cauldron works';
@@ -49,50 +49,67 @@ $msg = run( 'SELECT pg_healer_cauldron()' );
 like( $msg, qr/pg_healer_cauldron/, $t );
 
 $t = '(pd_special) Corrupting a page by changing the pd_special location';
-$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_special')} );
+$msg = run( qq{SELECT pg_healer_corrupt('$table', 'pd_special')} );
 like( $msg, qr/pd_special/, $t );
 
 $t = '(pd_special) Selecting from the corrupted table gives expected error';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
+
 like( $msg, qr/ page verification failed/, $t );
 $t = '(freespace) Selecting from the corrupted table invokes auto healing';
 like( $msg, qr/external checksum/, $t );
 
 $t = '(pd_special) Selecting a second time from the corrupted table succeeds';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/12345/, $t );
 
 $t = '(lsn) Corrupting a page by changing the LSN';
-$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_lsn')} );
+$msg = run( qq{SELECT pg_healer_corrupt('$table', 'pd_lsn')} );
 like( $msg, qr/LSN/, $t );
 
 $t = '(lsn) Selecting from the corrupted table gives expected error';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/ page verification failed/, $t );
 $t = '(freespace) Selecting from the corrupted table invokes auto healing';
 like( $msg, qr/external checksum/, $t );
 
 $t = '(lsn) Selecting a second time from the corrupted table succeeds';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/12345/, $t );
 
 ## Modify the file, but do not rsync
 $t = 'Modify the table but do not copy it';
-$msg = run( 'UPDATE foobar SET id=id' );
+$msg = run( "UPDATE $table SET id=id" );
 like( $msg, qr/UPDATE/, $t );
 
 $t = '(sizever) Corrupting a page by changing the pagesize header';
-$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_pagesize_version')} );
+$msg = run( qq{SELECT pg_healer_corrupt('$table', 'pd_pagesize_version')} );
 like( $msg, qr/pd_pagesize_version/, $t );
 
 $t = '(sizever) Selecting from the corrupted table gives expected error';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
+
 like( $msg, qr/ page verification failed/, $t );
 $t = '(freespace) Selecting from the corrupted table invokes auto healing';
 like( $msg, qr/intrinsic healing/, $t );
 
 $t = '(sizever) Selecting a second time from the corrupted table succeeds';
-$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+$msg = run( "SELECT id FROM $table LIMIT 1" );
 like( $msg, qr/12345/, $t );
+
+$t = '(bad_checksum) Corrupting a page by changing the checksum';
+$msg = rund( qq{SELECT pg_healer_corrupt('$table', 'checksum')} );
+like( $msg, qr/Checksum forced/, $t );
+
+$t = '(bad_checksum) Selecting from the corrupted table gives expected error';
+$msg = rund( "SELECT id FROM $table LIMIT 1" );
+like( $msg, qr/ page verification failed/, $t );
+$t = '(bad_checksum) Selecting from the corrupted table invokes auto healing';
+like( $msg, qr/external checksum/, $t );
+
+$t = '(bad_checksum) Selecting a second time from the corrupted table succeeds';
+$msg = run( "SELECT id FROM $table LIMIT 1" );
+like( $msg, qr/12345/, $t );
+
 
 done_testing();
