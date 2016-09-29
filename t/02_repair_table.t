@@ -6,95 +6,93 @@ use 5.006;
 use strict;
 use warnings;
 use Cwd;
-use Test::More;
+use Test::Most;
 use lib 't','.';
 require 'pg_healer_test_setup.pl';
 select(($|=1,select(STDERR),$|=1)[1]);
 
 ## Move all this to the shared file
-my $datadir = 'testdata';
 my $psql   = $ENV{PG_PSQL} || 'psql';
-my $path = Cwd::abs_path();
-my $socketdir = "$path/$datadir/socket";
--e $socketdir or mkdir $socketdir;
-my $testport = '5578';
 
-$psql .= " -h $socketdir -p $testport postgres";
-my $SQL = 'DROP TABLE IF EXISTS foobar';
-system "$psql -qc '$SQL'";
-$SQL = 'CREATE TABLE foobar AS SELECT 12345::int AS id FROM generate_series(1,10)';
-$SQL = 'CREATE TABLE foobar AS SELECT 12345::int AS id LIMIT 1';
-system "$psql -qc '$SQL'";
+my ($t,$msg);
 
-my $t = 'Extension installs cleanly';
-$SQL = q{DROP EXTENSION IF EXISTS pg_healer};
-system qq{$psql -qc "$SQL"};
+recreate_db();
 
-$SQL = q{CREATE EXTENSION pg_healer};
-system qq{$psql -qc "$SQL"};
-system qq{$psql -qc "CHECKPOINT"};
+my $table = 'foobar';
+
+run( "CREATE TABLE $table AS SELECT 12345::int AS id FROM generate_series(1,10)" );
+
+bail_on_fail;
+
+$t = 'Extension installs cleanly';
+run( 'DROP EXTENSION IF EXISTS pg_healer' );
+like( run( 'CREATE LANGUAGE plperlu'), qr/CREATE LANGUAGE/, "$t (plperlu)"); ## temporary!
+like( run( 'CREATE EXTENSION pg_healer' ), qr/CREATE EXTENSION/, "$t (pg_healer)" );
+run( 'CHECKPOINT' );
 
 $t = '(freespace) Corrupting a page by adding junk to the free space in the middle';
-$SQL = q{SELECT pg_healer_corrupt('foobar', 'freespace')};
-#system qq{$psql -qc "checkpoint"};
-system qq{$psql -qc "$SQL"};
-
-#system qq{$psql -c "SELECT pg_relation_filepath('foobar')"};
+$msg = run( q{SELECT pg_healer_corrupt('foobar', 'freespace')} );
+like( $msg, qr/Free space corruption introduced/, $t );
 
 $t = '(freespace) Selecting from the corrupted table gives expected error';
-$SQL = q{SELECT id FROM foobar LIMIT 1};
-my $magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/ invalid page in block/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/invalid page in block/, $t );
+$t = '(freespace) Selecting from the corrupted table invokes auto healing';
+like( $msg, qr/intrinsic healing/, $t );
 
-$t = '(freespace) Selecting a second time from the corrupted succeeds';
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/12345/, $t);
+$t = '(freespace) Selecting a second time from the corrupted table succeeds';
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/12345/, $t );
 
-$t = '(lsn) Running cauldron works';
-$SQL = q{SELECT pg_healer_cauldron()};
-system qq{$psql -qc "$SQL"};
+$t = '(lsn) Running pg_healer_cauldron works';
+$msg = run( 'SELECT pg_healer_cauldron()' );
+like( $msg, qr/pg_healer_cauldron/, $t );
 
 $t = '(pd_special) Corrupting a page by changing the pd_special location';
-$SQL = q{SELECT pg_healer_corrupt('foobar', 'pd_special')};
-system qq{$psql -qc "$SQL"};
+$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_special')} );
+like( $msg, qr/pd_special/, $t );
 
 $t = '(pd_special) Selecting from the corrupted table gives expected error';
-$SQL = q{SELECT id FROM foobar LIMIT 1};
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/ page verification failed/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/ page verification failed/, $t );
+$t = '(freespace) Selecting from the corrupted table invokes auto healing';
+like( $msg, qr/external checksum/, $t );
 
 $t = '(pd_special) Selecting a second time from the corrupted table succeeds';
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/12345/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/12345/, $t );
 
 $t = '(lsn) Corrupting a page by changing the LSN';
-$SQL = q{SELECT pg_healer_corrupt('foobar', 'pd_lsn')};
-system qq{$psql -qc "$SQL"};
+$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_lsn')} );
+like( $msg, qr/LSN/, $t );
 
 $t = '(lsn) Selecting from the corrupted table gives expected error';
-$SQL = q{SELECT id FROM foobar LIMIT 1};
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/ page verification failed/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/ page verification failed/, $t );
+$t = '(freespace) Selecting from the corrupted table invokes auto healing';
+like( $msg, qr/external checksum/, $t );
 
 $t = '(lsn) Selecting a second time from the corrupted table succeeds';
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/12345/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/12345/, $t );
 
 ## Modify the file, but do not rsync
-$SQL = "UPDATE foobar SET id=id";
-system qq{$psql -c "$SQL"};
+$t = 'Modify the table but do not copy it';
+$msg = run( 'UPDATE foobar SET id=id' );
+like( $msg, qr/UPDATE/, $t );
 
 $t = '(sizever) Corrupting a page by changing the pagesize header';
-$SQL = q{SELECT pg_healer_corrupt('foobar', 'pd_pagesize_version')};
-system qq{$psql -qc "$SQL"};
+$msg = run( q{SELECT pg_healer_corrupt('foobar', 'pd_pagesize_version')} );
+like( $msg, qr/pd_pagesize_version/, $t );
 
 $t = '(sizever) Selecting from the corrupted table gives expected error';
-$SQL = q{SELECT id FROM foobar LIMIT 1};
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/ page verification failed/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/ page verification failed/, $t );
+$t = '(freespace) Selecting from the corrupted table invokes auto healing';
+like( $msg, qr/intrinsic healing/, $t );
 
 $t = '(sizever) Selecting a second time from the corrupted table succeeds';
-$magik = qx{ $psql -c "$SQL" 2>&1};
-like ($magik, qr/12345/, $t);
+$msg = run( 'SELECT id FROM foobar LIMIT 1' );
+like( $msg, qr/12345/, $t );
 
 done_testing();
