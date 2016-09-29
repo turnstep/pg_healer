@@ -10,3 +10,5 @@ test:
 	prove --lib . --blib . t/
 
 
+indent:
+	pgindent --typedef=mytypedefs pg_healer.c
