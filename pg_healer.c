@@ -332,7 +332,7 @@ pg_healer_repair_buffer(char *pageBuffer, BlockNumber blockNumber, uint16 relTyp
 	uint16		pd_lower,
 				pd_upper;
 	int			i;
-	bool		problems_found = 0,
+	int			problems_found = 0,
 				problems_fixed = 0;
 	uint16		pd_special,
 				pd_pagesize_version;
@@ -440,8 +440,6 @@ pg_healer_repair_external(BlockNumber blockNumber, char *pageBuffer, char *fileP
 				ext_pd_upper;
 	int			i,
 				j;
-	int			problems_found = 0,
-				problems_fixed = 0;
 	uint16		byte_diffs,
 				row_diffs;
 	ItemId		itemId;
@@ -492,9 +490,7 @@ pg_healer_repair_external(BlockNumber blockNumber, char *pageBuffer, char *fileP
 			if (pageBuffer[i] != ext_pageBuffer[i])
 			{
 				elog(DEBUG2, "Copy position %d", i);
-				problems_found++;
 				pageBuffer[i] = ext_pageBuffer[i];
-				problems_fixed++;
 			}
 		}
 		return 2;
