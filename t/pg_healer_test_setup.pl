@@ -8,6 +8,7 @@ use Cwd;
 use 5.006;
 select(($|=1,select(STDERR),$|=1)[1]);
 
+my $DEBUG = 0;
 my $psql   = $ENV{PG_PSQL} || 'psql';
 my $testport = $ENV{PGPORT} || 5555;
 my $dbname = 'pg_healer_testing';
@@ -41,6 +42,7 @@ sub run {
         die "Keep the SQL simple, please! (invalid: $bad_sql)\n";
     }
     my $com = 1==$quiet ? $psql_quiet : 2==$quiet ? $psql_debug : $psql;
+    $DEBUG and warn qq{DEBUG: $com -c "$sql"};
     return qx{$com -c "$sql" 2>&1};
 }
 
